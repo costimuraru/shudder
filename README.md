@@ -38,7 +38,7 @@ commands = [["//etc/init.d/nginx", "stop"], ["/etc/init.d/filebeats", "stop"]]
 You can specify the config file path as an environment variable:
 
 ```bash
-CONFIG_FILE=/home/ubuntu/shudder.toml python -m shudder
+SHUDDER_CONFIG_FILE=/home/ubuntu/shudder.toml python -m shudder
 ```
 
 Shudder expects you to have credentials *somehow*. Ideally you have an IAM role

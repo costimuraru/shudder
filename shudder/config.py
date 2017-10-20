@@ -17,7 +17,7 @@ import os
 import toml
 
 
-CONFIG_FILE = os.environ.get('CONFIG_FILE', "shudder.toml")
+CONFIG_FILE = os.environ.get('SHUDDER_CONFIG_FILE', "shudder.toml")
 CONFIG = {}
 
 
