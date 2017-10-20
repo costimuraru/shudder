@@ -24,11 +24,9 @@ import hashlib
 from shudder.config import CONFIG
 import shudder.metadata as metadata
 
-
 INSTANCE_ID = metadata.get_instance_id()
 QUEUE_NAME = "{prefix}-{id}".format(prefix=CONFIG['sqs_prefix'],
                                     id=INSTANCE_ID)
-
 
 def create_queue():
     """Creates the SQS queue and returns the queue url and metadata"""

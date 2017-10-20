@@ -13,25 +13,31 @@
 # limitations under the License.
 
 """Start polling of SQS and metadata."""
-import shudder.queue as queue
-import shudder.metadata as metadata
-from shudder.config import CONFIG
+
+import logging
+from log import init_logging
+
+init_logging()
 
 import time
-import os
 import requests
 import signal
 import subprocess
 import sys
+import shudder.queue as queue
+import shudder.metadata as metadata
+from shudder.config import CONFIG
 
 def receive_signal(signum, stack):
     if signum in [1,2,3,15]:
-        print 'Caught signal %s, exiting.' %(str(signum))
+        logging.info('Caught signal %s, exiting.' % str(signum))
         sys.exit()
     else:
-        print 'Caught signal %s, ignoring.' %(str(signum))
+        logging.debug('Caught signal %s, ignoring.' % str(signum))
 
 if __name__ == '__main__':
+    logging.info('Started shudder.')
+
     uncatchable = ['SIG_DFL','SIGSTOP','SIGKILL']
     for i in [x for x in dir(signal) if x.startswith("SIG")]:
         if not i in uncatchable:
@@ -48,16 +54,19 @@ if __name__ == '__main__':
                 requests.get(CONFIG["endpoint"])
             if 'endpoints' in CONFIG:
                 for endpoint in CONFIG["endpoints"]:
+                    logging.info('Calling endpoint %s' % endpoint)
                     requests.get(endpoint)
             if 'commands' in CONFIG:
                 for command in CONFIG["commands"]:
-                    print 'Running command: %s' % command
+                    logging.info('Running command: %s' % command)
                     process = subprocess.Popen(command)
                     while process.poll() is None:
                         time.sleep(30)
-                        """Send a heart beat to aws"""
+                        logging.info('Sending a heart beat to AWS.')
                         queue.record_lifecycle_action_heartbeat(message)
-            """Send a complete lifecycle action"""
+            logging.info('Sending a COMPLETE lifecycle action.')
             queue.complete_lifecycle_action(message)
+            logging.info('Finished successfully. Exiting now.')
             sys.exit(0)
-        time.sleep(5)
+        logging.info('Waiting for TERMINATION trigger.')
+        time.sleep(10)
