@@ -49,6 +49,12 @@ on your server and it can pick it up that way, otherwise it'll look for a
 *This project has to be run on an EC2 instance because it looks up the instance
  ID in the instance metadata. It'll break anywhere but on EC2.*
 
+## Create a RPM
+
+```bash
+python setup.py bdist_rpm --binary-only --requires python-pip --pre-install pkg_scripts/preInstall.sh
+```
+
 ## Permissions
 
 Your credentials need to be able to subscribe to your SNS
