@@ -28,3 +28,6 @@ def get_instance_id():
     r = get("http://169.254.169.254/latest/meta-data/instance-id")
     return r.text
 
+def get_region():
+    r = get("http://169.254.169.254/latest/meta-data/placement/availability-zone")
+    return r.text[:-1]

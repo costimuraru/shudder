@@ -25,22 +25,23 @@ from shudder.config import CONFIG
 import shudder.metadata as metadata
 
 INSTANCE_ID = metadata.get_instance_id()
-QUEUE_NAME = "{prefix}-{id}".format(prefix=CONFIG['sqs_prefix'],
-                                    id=INSTANCE_ID)
+REGION = metadata.get_region()
+QUEUE_NAME = "{prefix}-{id}".format(prefix=CONFIG['sqs_prefix'], id=INSTANCE_ID)
+SNS_TOPIC = CONFIG['sns_topic'].replace("REGION_MACRO", REGION).replace(" ", "")
 
 def create_queue():
     """Creates the SQS queue and returns the queue url and metadata"""
-    conn = boto3.client('sqs', region_name=CONFIG['region'])
+    conn = boto3.client('sqs', region_name=REGION)
     queue_metadata = conn.create_queue(QueueName=QUEUE_NAME, Attributes={'VisibilityTimeout':'3600'})
     """Get the SQS queue object from the queue URL"""
-    sqs = boto3.resource('sqs', region_name=CONFIG['region'])
+    sqs = boto3.resource('sqs', region_name=REGION)
     queue = sqs.Queue(queue_metadata['QueueUrl'])
     return conn, queue
 
 
 def subscribe_sns(queue):
     """Attach a policy to allow incoming connections from SNS"""
-    statement_id = hashlib.md5((CONFIG['sns_topic'] +  queue.attributes.get('QueueArn')).encode('utf-8')).hexdigest()
+    statement_id = hashlib.md5((SNS_TOPIC +  queue.attributes.get('QueueArn')).encode('utf-8')).hexdigest()
     statement_id_exists = False
     existing_policy = queue.attributes.get('Policy')
     if existing_policy:
@@ -61,12 +62,12 @@ def subscribe_sns(queue):
             'Principal': {'AWS': '*'},
             'Resource': queue.attributes.get('QueueArn'),
             'Sid': statement_id,
-            'Condition': {"ForAllValues:ArnEquals":{"aws:SourceArn":CONFIG['sns_topic']}}}
+            'Condition': {"ForAllValues:ArnEquals":{"aws:SourceArn":SNS_TOPIC}}}
         policy['Statement'].append(statement)
     queue.set_attributes(Attributes={'Policy':json.dumps(policy)})
     """Subscribes the SNS topic to the queue."""
-    conn = boto3.client('sns', region_name=CONFIG['region'])
-    sub = conn.subscribe(TopicArn=CONFIG['sns_topic'], Protocol='sqs', Endpoint=queue.attributes.get('QueueArn'))
+    conn = boto3.client('sns', region_name=REGION)
+    sub = conn.subscribe(TopicArn=SNS_TOPIC, Protocol='sqs', Endpoint=queue.attributes.get('QueueArn'))
     sns_arn = sub['SubscriptionArn']
     return conn, sns_arn
 
@@ -90,7 +91,7 @@ def clean_up_sns(sns_conn, sns_arn, queue):
 
 def record_lifecycle_action_heartbeat(message):
     """Let AWS know we're still in the process of shutting down"""
-    conn = boto3.client('autoscaling', region_name=CONFIG['region'])
+    conn = boto3.client('autoscaling', region_name=REGION)
     conn.record_lifecycle_action_heartbeat(
         LifecycleHookName=message['LifecycleHookName'],
         AutoScalingGroupName=message['AutoScalingGroupName'],
@@ -100,7 +101,7 @@ def record_lifecycle_action_heartbeat(message):
 
 def complete_lifecycle_action(message):
     """Let AWS know it's safe to terminate the instance now"""
-    conn = boto3.client('autoscaling', region_name=CONFIG['region'])
+    conn = boto3.client('autoscaling', region_name=REGION)
     conn.complete_lifecycle_action(
         LifecycleHookName=message['LifecycleHookName'],
         AutoScalingGroupName=message['AutoScalingGroupName'],
