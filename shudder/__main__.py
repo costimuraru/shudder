@@ -13,8 +13,6 @@
 # limitations under the License.
 
 import daemon
-import logging
-import time
 import daemon.pidfile
 
 if __name__ == "__main__":

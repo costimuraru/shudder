@@ -14,12 +14,7 @@
 
 """Configuration for shudder"""
 import os
-import toml
+from pyhocon import ConfigFactory
 
-
-CONFIG_FILE = os.environ.get('SHUDDER_CONFIG_FILE', "shudder.toml")
-CONFIG = {}
-
-
-with open(CONFIG_FILE, 'r') as f:
-    CONFIG = toml.loads(f.read())
+CONFIG_FILE = os.environ.get('SHUDDER_CONFIG_FILE', "shudder.conf")
+CONFIG = ConfigFactory.parse_file(CONFIG_FILE)

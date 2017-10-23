@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 setup(
     name='shudder',
     description="Graceful shutdowns using autoscaling lifecycle hooks.",
-    version='1.0.4',
+    version='1.0.7',
     long_description=__doc__,
     packages=find_packages(),
     data_files=[('/etc/init.d', [os.getcwd().split('/build/', 1)[0] + '/pkg_scripts/shudder'])],

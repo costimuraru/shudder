@@ -27,12 +27,11 @@ pip install .
 
 You need a toml file looking like this:
 
-```toml
+```hocon
 sqs_prefix = "myapp"
-region = "us-east-1"
-sns_topic = "arn:aws:sns:us-east-1:723456455537:myapp-shutdowns"
+sns_topic = "arn:aws:sns:REGION_MACRO:723456455537:myapp-shutdowns"
 endpoints = ["http://127.0.0.1:5000/youaregoingtodiesoon", "http://127.0.0.1:5001/shutdown"]
-commands = [["//etc/init.d/nginx", "stop"], ["/etc/init.d/filebeats", "stop"]]
+commands = ["/etc/init.d/nginx stop", "/etc/init.d/filebeats stop"]
 ```
 
 You can specify the config file path as an environment variable:
@@ -52,7 +51,8 @@ on your server and it can pick it up that way, otherwise it'll look for a
 ## Create a RPM
 
 ```bash
-python setup.py bdist_rpm --binary-only --requires python-pip --pre-install pkg_scripts/preInstall.sh
+python setup.py bdist_rpm --binary-only --requires python-pip \ 
+  --pre-install pkg_scripts/preInstall.sh --post-install pkg_scripts/postInstall.sh
 ```
 
 ## Permissions

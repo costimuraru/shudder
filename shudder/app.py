@@ -18,11 +18,13 @@ import logging
 import time
 import requests
 import signal
+import socket
 import subprocess
 import sys
 import shudder.queue as queue
 import shudder.metadata as metadata
 from shudder.config import CONFIG
+
 
 def receive_signal(signum, stack):
     if signum in [1,2,3,15]:
@@ -30,6 +32,24 @@ def receive_signal(signum, stack):
         sys.exit()
     else:
         logging.debug('Caught signal %s, ignoring.' % str(signum))
+
+last_heart_beat = 0
+def send_heart_beat(message):
+    global last_heart_beat
+    time_now = time.time()
+    if time_now - last_heart_beat >= 60:
+        logging.info('Sending a heart beat to AWS.')
+        queue.record_lifecycle_action_heartbeat(message)
+        last_heart_beat = time.time()
+
+
+def replace_macros(command):
+    hostname = socket.gethostname()
+    command = command.replace("INSTANCEID_MACRO", queue.INSTANCE_ID)
+    command = command.replace("REGION_MACRO", queue.REGION)
+    command = command.replace("HOSTNAME_MACRO", hostname)
+    return command
+
 
 def start_shudder():
     logging.info('Started shudder.')
@@ -54,12 +74,18 @@ def start_shudder():
                     requests.get(endpoint)
             if 'commands' in CONFIG:
                 for command in CONFIG["commands"]:
+                    command = replace_macros(command)
                     logging.info('Running command: %s' % command)
-                    process = subprocess.Popen(command)
+                    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                     while process.poll() is None:
-                        time.sleep(30)
-                        logging.info('Sending a heart beat to AWS.')
-                        queue.record_lifecycle_action_heartbeat(message)
+                        time.sleep(1)
+                        send_heart_beat(message)
+
+                    out, err = process.communicate()
+                    if out:
+                        logging.info('Command output\n>>>>\n%s\n<<<<' % out)
+                    if err:
+                        logging.error('Command error\n>>>>\n%s\n<<<<' % err)
             logging.info('Sending a COMPLETE lifecycle action.')
             queue.complete_lifecycle_action(message)
             logging.info('Finished successfully. Exiting now.')

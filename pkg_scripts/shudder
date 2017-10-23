@@ -26,6 +26,9 @@ APPARGS="-m shudder.__main__"
 PIDFILE="/var/run/shudder/shudder.pid"
 
 start() {
+    if [ -f /etc/profile ]; then
+        source /etc/profile
+    fi
     if [ -f $PIDFILE ]; then
       pid=`cat $PIDFILE`
       is_running=`ps -elf | grep $pid`
@@ -34,7 +37,7 @@ start() {
       echo "App $APPNAME is already started."
     else
       $APPBIN $APPARGS
-      echo "Started $APPNAME."
+      echo "Started $APPNAME using config from $SHUDDER_CONFIG_FILE."
     fi
 }
 
