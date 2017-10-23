@@ -15,16 +15,16 @@
 """Module to set up polling of instance metadata for the termination of a spot instance
 
 """
-import requests
+from requests import get
 
 
 def poll_instance_metadata():
     """Check instance metadata for a scheduled termination"""
-    r = requests.get("http://169.254.169.254/latest/meta-data/spot/termination-time")
+    r = get("http://169.254.169.254/latest/meta-data/spot/termination-time")
     return r.status_code < 400
 
 def get_instance_id():
     """Check instance metadata for an instance id"""
-    r = requests.get("http://169.254.169.254/latest/meta-data/instance-id")
+    r = get("http://169.254.169.254/latest/meta-data/instance-id")
     return r.text
 

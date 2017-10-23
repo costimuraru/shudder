@@ -3,6 +3,7 @@ and notifying another service that it needs a graceful shutdown.
 
 """
 from setuptools import setup, find_packages
+import os 
 
 with open('requirements.txt') as f:
     requirements = f.readlines()
@@ -10,9 +11,10 @@ with open('requirements.txt') as f:
 setup(
     name='shudder',
     description="Graceful shutdowns using autoscaling lifecycle hooks.",
-    version='1.0.0',
+    version='1.0.4',
     long_description=__doc__,
     packages=find_packages(),
+    data_files=[('/etc/init.d', [os.getcwd().split('/build/', 1)[0] + '/pkg_scripts/shudder'])],
     include_package_data=True,
     author='Anthony Grimes',
     author_email='anthony@scopely.com',
