@@ -51,6 +51,33 @@ def replace_macros(command):
     return command
 
 
+def run_command(message, command):
+    try:
+        command = replace_macros(command)
+        logging.info('Running command: %s' % command)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        while process.poll() is None:
+            time.sleep(1)
+            send_heart_beat(message)
+
+        out, err = process.communicate()
+        if out.strip():
+            logging.info('Command output\n>>>>\n%s\n<<<<' % out)
+        if err.strip():
+            logging.error('Command error\n>>>>\n%s\n<<<<' % err)
+        logging.info("Successfully ran command.")
+    except Exception as e:
+        logging.error("Unexpected error while running command '%s': %s" % (str(command), str(e)))
+
+
+def call_endpoint(endpoint):
+    try:
+        logging.info('Calling endpoint %s' % endpoint)
+        requests.get(endpoint)
+    except Exception as e:
+        logging.error("Unexpected error while calling endpoint '%s': %s" % (str(endpoint), str(e)))
+
+
 def start_shudder():
     logging.info('Started shudder.')
 
@@ -60,32 +87,20 @@ def start_shudder():
             signum = getattr(signal,i)
             signal.signal(signum,receive_signal)
 
-    sqs_connection, sqs_queue = queue.create_queue()
-    sns_connection, subscription_arn = queue.subscribe_sns(sqs_queue)
+    queue_url = queue.create_queue()
+    sns_connection, subscription_arn = queue.subscribe_sns(queue_url)
     while True:
-        message = queue.poll_queue(sqs_connection, sqs_queue)
+        message = queue.poll_queue(queue_url)
         if message or metadata.poll_instance_metadata():
-            queue.clean_up_sns(sns_connection, subscription_arn, sqs_queue)
+            queue.clean_up_sns(sns_connection, subscription_arn, queue_url)
             if 'endpoint' in CONFIG:
-                requests.get(CONFIG["endpoint"])
+                call_endpoint(CONFIG["endpoint"])
             if 'endpoints' in CONFIG:
                 for endpoint in CONFIG["endpoints"]:
-                    logging.info('Calling endpoint %s' % endpoint)
-                    requests.get(endpoint)
+                    call_endpoint(endpoint)
             if 'commands' in CONFIG:
                 for command in CONFIG["commands"]:
-                    command = replace_macros(command)
-                    logging.info('Running command: %s' % command)
-                    process = subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    while process.poll() is None:
-                        time.sleep(1)
-                        send_heart_beat(message)
-
-                    out, err = process.communicate()
-                    if out:
-                        logging.info('Command output\n>>>>\n%s\n<<<<' % out)
-                    if err:
-                        logging.error('Command error\n>>>>\n%s\n<<<<' % err)
+                    run_command(message, command)
             logging.info('Sending a COMPLETE lifecycle action.')
             queue.complete_lifecycle_action(message)
             logging.info('Finished successfully. Exiting now.')

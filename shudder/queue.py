@@ -17,6 +17,7 @@ an sns topic polling for messages pertaining to our
 impending doom.
 
 """
+import logging
 import json
 import boto3
 import hashlib
@@ -31,16 +32,20 @@ SNS_TOPIC = CONFIG['sns_topic'].replace("REGION_MACRO", REGION).replace(" ", "")
 
 def create_queue():
     """Creates the SQS queue and returns the queue url and metadata"""
+    logging.info("Creating queue %s" % QUEUE_NAME)
     conn = boto3.client('sqs', region_name=REGION)
     queue_metadata = conn.create_queue(QueueName=QUEUE_NAME, Attributes={'VisibilityTimeout':'3600'})
-    """Get the SQS queue object from the queue URL"""
+    return queue_metadata['QueueUrl']
+
+def get_queue(queue_url):
     sqs = boto3.resource('sqs', region_name=REGION)
-    queue = sqs.Queue(queue_metadata['QueueUrl'])
-    return conn, queue
+    queue = sqs.Queue(queue_url)
+    return queue
 
-
-def subscribe_sns(queue):
+def subscribe_sns(queue_url):
     """Attach a policy to allow incoming connections from SNS"""
+    logging.info("Subscribe SNS to the queue %s" % str(queue_url))
+    queue = get_queue(queue_url)
     statement_id = hashlib.md5((SNS_TOPIC +  queue.attributes.get('QueueArn')).encode('utf-8')).hexdigest()
     statement_id_exists = False
     existing_policy = queue.attributes.get('Policy')
@@ -72,19 +77,31 @@ def subscribe_sns(queue):
     return conn, sns_arn
 
 
-def should_terminate(msg):
-    """Check if the termination message is about our instance"""
-    first_box = json.loads(msg.body)
-    message = json.loads(first_box['Message'])
-    termination_msg = 'autoscaling:EC2_INSTANCE_TERMINATING'
-
-    if 'LifecycleTransition' in message and message['LifecycleTransition'] == termination_msg and INSTANCE_ID == message['EC2InstanceId']:
-        return message
-    else:
+def getJsonMessage(msg):
+    try:
+        first_box = json.loads(msg.body)
+        return json.loads(first_box['Message'])
+    except Exception as e:
+        logging.error("Unexpected error while parsing SQS message '%s': %s" % (str(msg.body), str(e)))
         return None
 
-def clean_up_sns(sns_conn, sns_arn, queue):
+
+def should_terminate(json_message):
+    """Check if the termination message is about our instance"""
+    if json_message is None:
+        return False
+
+    termination_msg = 'autoscaling:EC2_INSTANCE_TERMINATING'
+    if 'LifecycleTransition' in json_message and json_message['LifecycleTransition'] == termination_msg and INSTANCE_ID == json_message['EC2InstanceId']:
+        return True
+    else:
+        return False
+
+
+def clean_up_sns(sns_conn, sns_arn, queue_url):
     """Clean up SNS subscription and SQS queue"""
+    logging.info("Cleaning up SNS and SQS")
+    queue = get_queue(queue_url)
     queue.delete()
     sns_conn.unsubscribe(SubscriptionArn=sns_arn)
 
@@ -110,10 +127,18 @@ def complete_lifecycle_action(message):
         InstanceId=message['EC2InstanceId'])
 
 
-def poll_queue(conn, queue):
+def poll_queue(queue_url):
     """Poll SQS until we get a termination message."""
+    queue = get_queue(queue_url)
     messages = queue.receive_messages()
+    termination_message = None
     for message in messages:
+        json_message = getJsonMessage(message)
+        if should_terminate(json_message):
+            logging.info("Received termination message for this instance: %s" % str(json_message))
+            termination_message = json_message
+        else:
+            logging.info("Ignoring termination message: %s - %s" % (message, json_message))
         message.delete()
-        return should_terminate(message)
-    return False
+
+    return termination_message
