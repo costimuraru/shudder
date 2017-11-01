@@ -16,5 +16,5 @@
 import os
 from pyhocon import ConfigFactory
 
-CONFIG_FILE = os.environ.get('SHUDDER_CONFIG_FILE', "shudder.conf")
+CONFIG_FILE = os.environ.get('SHUDDER_CONFIG_FILE', "/usr/local/demdex/conf/dcs/shutdown.conf")
 CONFIG = ConfigFactory.parse_file(CONFIG_FILE)

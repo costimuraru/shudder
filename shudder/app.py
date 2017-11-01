@@ -17,6 +17,7 @@
 import logging
 import time
 import requests
+import os
 import signal
 import socket
 import subprocess
@@ -55,8 +56,13 @@ def run_command(message, command):
     try:
         command = replace_macros(command)
         logging.info('Running command: %s' % command)
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid)
+        start_time = time.time()
         while process.poll() is None:
+            if time.time() - start_time >= 3600:
+                logging.warn("Killing process which exceeded 3600 seconds.")
+                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                break
             time.sleep(1)
             send_heart_beat(message)
 
